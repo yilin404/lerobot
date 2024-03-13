@@ -4,7 +4,16 @@ import torch
 from tensordict import TensorDictBase
 from tensordict.nn import dispatch
 from tensordict.utils import NestedKey
-from torchrl.envs.transforms import ObservationTransform, Transform
+from torchrl.envs.transforms import ObservationTransform, Transform, TransformedEnv
+from torchrl.envs.transforms.transforms import _TEnvPostInit
+
+from lerobot.common.envs.abstract import EnvBaseWithMultiStepRollouts
+
+
+class TransformedEnv(EnvBaseWithMultiStepRollouts, TransformedEnv, metaclass=_TEnvPostInit):
+    """Keep method overrides from EnvBaseWithMultiStepRollouts."""
+
+    pass
 
 
 class Prod(ObservationTransform):
