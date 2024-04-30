@@ -4,20 +4,21 @@ useless dependencies when using datasets.
 """
 
 import io
+import shutil
 from pathlib import Path
 
 import tqdm
 
 
-def download_raw(root, dataset_id) -> Path:
+def download_raw(raw_dir, dataset_id) -> Path:
     if "pusht" in dataset_id:
-        return download_pusht(root=root, dataset_id=dataset_id)
+        return download_pusht(raw_dir)
     elif "xarm" in dataset_id:
-        return download_xarm(root=root, dataset_id=dataset_id)
+        return download_xarm(raw_dir)
     elif "aloha" in dataset_id:
-        return download_aloha(root=root, dataset_id=dataset_id)
+        return download_aloha(raw_dir, dataset_id)
     elif "umi" in dataset_id:
-        return download_umi(root=root, dataset_id=dataset_id)
+        return download_umi(raw_dir)
     else:
         raise ValueError(dataset_id)
 
@@ -50,42 +51,37 @@ def download_and_extract_zip(url: str, destination_folder: Path) -> bool:
         return False
 
 
-def download_pusht(root: str, dataset_id: str = "pusht", fps: int = 10) -> Path:
+def download_pusht(raw_dir: str):
     pusht_url = "https://diffusion-policy.cs.columbia.edu/data/training/pusht.zip"
-    pusht_zarr = Path("pusht/pusht_cchi_v7_replay.zarr")
 
-    root = Path(root)
-    raw_dir: Path = root / f"{dataset_id}_raw"
-    zarr_path: Path = (raw_dir / pusht_zarr).resolve()
+    zarr_path = raw_dir / "pusht_cchi_v7_replay.zarr"
     if not zarr_path.is_dir():
         raw_dir.mkdir(parents=True, exist_ok=True)
-        download_and_extract_zip(pusht_url, raw_dir)
-    return zarr_path
+        download_and_extract_zip(pusht_url, zarr_path)
 
 
-def download_xarm(root: str, dataset_id: str, fps: int = 15) -> Path:
-    root = Path(root)
-    raw_dir: Path = root / "xarm_datasets_raw"
-    if not raw_dir.exists():
-        import zipfile
+def download_xarm(raw_dir: str) -> Path:
+    """Download all xarm datasets at once"""
+    import zipfile
 
-        import gdown
+    import gdown
 
-        raw_dir.mkdir(parents=True, exist_ok=True)
-        # from https://github.com/fyhMer/fowm/blob/main/scripts/download_datasets.py
-        url = "https://drive.google.com/uc?id=1nhxpykGtPDhmQKm-_B8zBSywVRdgeVya"
-        zip_path = raw_dir / "data.zip"
-        gdown.download(url, str(zip_path), quiet=False)
-        print("Extracting...")
-        with zipfile.ZipFile(str(zip_path), "r") as zip_f:
-            for member in zip_f.namelist():
-                if member.startswith("data/xarm") and member.endswith(".pkl"):
-                    print(member)
-                    zip_f.extract(member=member)
-        zip_path.unlink()
-
-    dataset_path: Path = root / f"{dataset_id}"
-    return dataset_path
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    # from https://github.com/fyhMer/fowm/blob/main/scripts/download_datasets.py
+    url = "https://drive.google.com/uc?id=1nhxpykGtPDhmQKm-_B8zBSywVRdgeVya"
+    zip_path = raw_dir / "data.zip"
+    gdown.download(url, str(zip_path), quiet=False)
+    print("Extracting...")
+    with zipfile.ZipFile(str(zip_path), "r") as zip_f:
+        for path in zip_f.namelist():
+            if path.startswith("data/xarm") and path.endswith(".pkl"):
+                zip_f.extract(member=path)
+                # move to corresponding raw directory
+                member_dir = path.replace("/buffer.pkl", "")
+                member_raw_dir = path.replace("/buffer.pkl", "_raw")
+                shutil.move(path, member_raw_dir)
+                shutil.rmtree(member_dir)
+    zip_path.unlink()
 
 
 def download_aloha(root: str, dataset_id: str) -> Path:
@@ -148,13 +144,9 @@ def download_aloha(root: str, dataset_id: str) -> Path:
     return raw_dir
 
 
-def download_umi(root: str, dataset_id: str) -> Path:
+def download_umi(raw_dir: Path) -> Path:
     url_cup_in_the_wild = "https://real.stanford.edu/umi/data/zarr_datasets/cup_in_the_wild.zarr.zip"
-    cup_in_the_wild_zarr = Path("umi/cup_in_the_wild/cup_in_the_wild.zarr")
-
-    root = Path(root)
-    raw_dir: Path = root / f"{dataset_id}_raw"
-    zarr_path: Path = (raw_dir / cup_in_the_wild_zarr).resolve()
+    zarr_path = raw_dir / "cup_in_the_wild.zarr"
     if not zarr_path.is_dir():
         raw_dir.mkdir(parents=True, exist_ok=True)
         download_and_extract_zip(url_cup_in_the_wild, zarr_path)
@@ -162,7 +154,7 @@ def download_umi(root: str, dataset_id: str) -> Path:
 
 
 if __name__ == "__main__":
-    root = "data"
+    data_dir = Path("data")
     dataset_ids = [
         "pusht",
         "xarm_lift_medium",
@@ -176,4 +168,5 @@ if __name__ == "__main__":
         "umi_cup_in_the_wild",
     ]
     for dataset_id in dataset_ids:
-        download_raw(root=root, dataset_id=dataset_id)
+        raw_dir = data_dir / f"{dataset_id}_raw"
+        download_raw(raw_dir, dataset_id)

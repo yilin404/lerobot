@@ -12,7 +12,9 @@ from safetensors.torch import load_file
 
 import lerobot
 from lerobot.common.datasets.factory import make_dataset
-from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
+from lerobot.common.datasets.lerobot_dataset import (
+    LeRobotDataset,
+)
 from lerobot.common.datasets.utils import (
     compute_stats,
     flatten_dict,
@@ -22,8 +24,7 @@ from lerobot.common.datasets.utils import (
     unflatten_dict,
 )
 from lerobot.common.utils.utils import init_hydra_config
-
-from .utils import DEFAULT_CONFIG_PATH, DEVICE
+from tests.utils import DEFAULT_CONFIG_PATH, DEVICE
 
 
 @pytest.mark.parametrize("env_name, repo_id, policy_name", lerobot.env_dataset_policy_triplets)
