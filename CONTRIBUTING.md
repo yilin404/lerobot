@@ -139,11 +139,13 @@ Follow these steps to start contributing:
 
    To develop on 🤗 LeRobot, you will at least need to install the `dev` and `test` extras dependencies along with the core library:
    ```bash
+   pip install poetry
    poetry install --sync --extras "dev test"
    ```
 
    You can also install the project with all its dependencies (including environments):
    ```bash
+   pip install poetry
    poetry install --sync --all-extras
    ```
 
