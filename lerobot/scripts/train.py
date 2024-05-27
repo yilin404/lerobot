@@ -93,7 +93,7 @@ def update_policy(policy, batch, optimizer, grad_clip_norm, lr_scheduler=None):
     policy.train()
     output_dict = policy.forward(batch)
     # TODO(rcadene): policy.unnormalize_outputs(out_dict)
-    loss = output_dict["loss"]
+    loss = output_dict["loss"].mean()
     loss.backward()
     grad_norm = torch.nn.utils.clip_grad_norm_(
         policy.parameters(),
