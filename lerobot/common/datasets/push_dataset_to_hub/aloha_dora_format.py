@@ -40,7 +40,7 @@ def check_format(raw_dir) -> bool:
     return True
 
 
-def load_from_raw(raw_dir: Path, out_dir: Path):
+def load_from_raw(raw_dir: Path, out_dir: Path, fps: int):
     # Load data stream that will be used as reference for the timestamps synchronization
     reference_key = "observation.images.cam_right_wrist"
     reference_df = pd.read_parquet(raw_dir / f"{reference_key}.parquet")
@@ -58,7 +58,8 @@ def load_from_raw(raw_dir: Path, out_dir: Path):
             df,
             modality_df,
             on="timestamp_utc",
-            direction="backward",
+            direction="nearest",
+            tolerance=pd.Timedelta(f"{1/fps} seconds"),
         )
 
     # Remove rows with a NaN in any column. It can happened during the first frames of an episode,
@@ -186,7 +187,7 @@ def from_raw_to_lerobot_format(raw_dir: Path, out_dir: Path, fps=None, video=Tru
     if not video:
         raise NotImplementedError()
 
-    data_df, episode_data_index = load_from_raw(raw_dir, out_dir)
+    data_df, episode_data_index = load_from_raw(raw_dir, out_dir, fps)
     hf_dataset = to_hf_dataset(data_df, video)
 
     info = {
