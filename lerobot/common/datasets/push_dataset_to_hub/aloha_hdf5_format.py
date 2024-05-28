@@ -43,8 +43,7 @@ def get_cameras(hdf5_data):
 
 
 def check_format(raw_dir) -> bool:
-    # only frames from simulation are uncompressed
-    compressed_images = "sim" not in raw_dir.name
+    compressed_images = None
 
     hdf5_paths = list(raw_dir.glob("episode_*.hdf5"))
     assert len(hdf5_paths) != 0
@@ -62,18 +61,20 @@ def check_format(raw_dir) -> bool:
             for camera in get_cameras(data):
                 assert num_frames == data[f"/observations/images/{camera}"].shape[0]
 
-                if compressed_images:
-                    assert data[f"/observations/images/{camera}"].ndim == 2
+                assert data[f"/observations/images/{camera}"].ndim in [2, 4]
+                if data[f"/observations/images/{camera}"].ndim == 2:
+                    assert compressed_images is None or compressed_images
+                    compressed_images = True
                 else:
+                    assert compressed_images is None or not compressed_images
+                    compressed_images = False
                     assert data[f"/observations/images/{camera}"].ndim == 4
                     b, h, w, c = data[f"/observations/images/{camera}"].shape
                     assert c < h and c < w, f"Expect (h,w,c) image format but ({h=},{w=},{c=}) provided."
+    return compressed_images
 
 
-def load_from_raw(raw_dir, out_dir, fps, video, debug):
-    # only frames from simulation are uncompressed
-    compressed_images = "sim" not in raw_dir.name
-
+def load_from_raw(raw_dir, out_dir, fps, video, debug, compressed_images):
     hdf5_files = list(raw_dir.glob("*.hdf5"))
     ep_dicts = []
     episode_data_index = {"from": [], "to": []}
@@ -199,12 +200,12 @@ def to_hf_dataset(data_dict, video) -> Dataset:
 
 def from_raw_to_lerobot_format(raw_dir: Path, out_dir: Path, fps=None, video=True, debug=False):
     # sanity check
-    check_format(raw_dir)
+    compressed_images = check_format(raw_dir)
 
     if fps is None:
         fps = 50
 
-    data_dir, episode_data_index = load_from_raw(raw_dir, out_dir, fps, video, debug)
+    data_dir, episode_data_index = load_from_raw(raw_dir, out_dir, fps, video, debug, compressed_images)
     hf_dataset = to_hf_dataset(data_dir, video)
 
     info = {

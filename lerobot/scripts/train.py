@@ -23,6 +23,7 @@ import hydra
 import torch
 from omegaconf import DictConfig
 from torch.cuda.amp import GradScaler
+from tqdm import tqdm
 
 from lerobot.common.datasets.factory import make_dataset
 from lerobot.common.datasets.utils import cycle
@@ -319,8 +320,8 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
 
     policy.train()
     is_offline = True
-    for step in range(cfg.training.offline_steps):
-        if step == 0:
+    for offline_step in tqdm(range(cfg.training.offline_steps)):
+        if offline_step == 0:
             logging.info("Start offline training on a fixed dataset")
         batch = next(dl_iter)
 
@@ -338,12 +339,12 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
         )
 
         # TODO(rcadene): is it ok if step_t=0 = 0 and not 1 as previously done?
-        if step % cfg.training.log_freq == 0:
-            log_train_info(logger, train_info, step, cfg, offline_dataset, is_offline)
+        if offline_step % cfg.training.log_freq == 0:
+            log_train_info(logger, train_info, offline_step, cfg, offline_dataset, is_offline)
 
         # Note: evaluate_and_checkpoint_if_needed happens **after** the `step`th training update has completed,
         # so we pass in step + 1.
-        evaluate_and_checkpoint_if_needed(step + 1)
+        evaluate_and_checkpoint_if_needed(offline_step + 1)
 
     # create an empty online dataset similar to offline dataset
     online_dataset = deepcopy(offline_dataset)
