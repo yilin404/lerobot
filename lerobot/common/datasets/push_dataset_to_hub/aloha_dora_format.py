@@ -52,6 +52,8 @@ def load_from_raw(raw_dir: Path, out_dir: Path, fps: int):
         key = path.stem  # action or observation.state or ...
         if key == reference_key:
             continue
+        elif "failed_episode_index" in key:
+            continue
         modality_df = pd.read_parquet(path)
         modality_df = modality_df[["timestamp_utc", key]]
         df = pd.merge_asof(
@@ -66,7 +68,7 @@ def load_from_raw(raw_dir: Path, out_dir: Path, fps: int):
     # because some cameras didnt start recording yet.
     df = df.dropna(axis=0)
 
-    # Remove rows with episode_index -1 which indicates a failed episode
+    # Remove rows with episode_index -1 which indicates data that correspond to in-between episodes
     df = df[df["episode_index"] != -1]
 
     # dora only use arrays, so single values are encapsulated into a list
