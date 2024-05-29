@@ -348,7 +348,7 @@ class ACT(nn.Module):
         images = batch["observation.images"]
 
         for cam_index in range(images.shape[-4]):
-            if self.config.n_obs_steps >= 1:
+            if self.config.n_obs_steps > 1:
                 assert images.ndim == 6
                 assert images.shape[1] == self.config.n_obs_steps
                 cam_images = images[:, :, cam_index]
