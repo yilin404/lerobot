@@ -329,8 +329,12 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
     logging.info("make_dataset")
     offline_dataset = make_dataset(cfg)
 
-    logging.info("make_env")
-    eval_env = make_env(cfg)
+    # Create environment used for evaluating checkpoints during training on simulation data.
+    # On real-world data, no need to create an environment as evaluations are done outside train.py,
+    # using the eval.py instead, with gym_dora environment and dora-rs.
+    if cfg.training.eval_freq > 0:
+        logging.info("make_env")
+        eval_env = make_env(cfg)
 
     logging.info("make_policy")
     policy = make_policy(hydra_cfg=cfg, dataset_stats=offline_dataset.stats)
@@ -356,7 +360,7 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
 
     # Note: this helper will be used in offline and online training loops.
     def evaluate_and_checkpoint_if_needed(step):
-        if step % cfg.training.eval_freq == 0:
+        if cfg.training.eval_freq > 0 and step % cfg.training.eval_freq == 0:
             logging.info(f"Eval policy at step {step}")
             eval_info = eval_policy(
                 eval_env,
@@ -416,6 +420,13 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
         evaluate_and_checkpoint_if_needed(step + 1)
 
         step += 1
+
+    logging.info("End of offline training")
+
+    if cfg.training.online_steps == 0:
+        if cfg.training.eval_freq > 0:
+            eval_env.close()
+        return
 
     # create an env dedicated to online episodes collection from policy rollout
     online_training_env = make_env(cfg, n_envs=1)
@@ -486,9 +497,10 @@ def train(cfg: DictConfig, out_dir: str | None = None, job_name: str | None = No
             step += 1
             online_step += 1
 
+    logging.info("End of online training")
+
     eval_env.close()
     online_training_env.close()
-    logging.info("End of training")
 
 
 if __name__ == "__main__":
