@@ -99,6 +99,10 @@ def load_from_raw(raw_dir: Path, out_dir: Path, fps: int):
 
     del df["timestamp_utc"]
 
+    # sanity check
+    has_nan = df.isna().any().any()
+    assert not has_nan
+
     # sanity check episode indices go from 0 to n-1
     ep_ids = [ep_idx for ep_idx, _ in df.groupby("episode_index")]
     expected_ep_ids = list(range(df["episode_index"].max() + 1))
