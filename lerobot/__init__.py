@@ -55,7 +55,7 @@ available_tasks_per_env = {
     ],
     "pusht": ["PushT-v0"],
     "xarm": ["XarmLift-v0"],
-    "dora_aloha_real": ["DoraAloha-v0", "DoraKoch-v0", "DoraReachy2-v0"],
+    "dora": ["DoraAloha-v0", "DoraKoch-v0", "DoraReachy2-v0"],
 }
 available_envs = list(available_tasks_per_env.keys())
 
@@ -81,7 +81,7 @@ available_datasets_per_env = {
         "lerobot/xarm_push_medium_image",
         "lerobot/xarm_push_medium_replay_image",
     ],
-    "dora_aloha_real": [
+    "dora": [
         "lerobot/aloha_static_battery",
         "lerobot/aloha_static_candy",
         "lerobot/aloha_static_coffee",
@@ -139,7 +139,7 @@ available_policies = [
 # keys and values refer to yaml files
 available_policies_per_env = {
     "aloha": ["act"],
-    "aloha_real": ["act"],
+    "dora": ["act"],
     "pusht": ["diffusion"],
     "xarm": ["tdmpc"],
     "dora_aloha_real": ["act_real"],

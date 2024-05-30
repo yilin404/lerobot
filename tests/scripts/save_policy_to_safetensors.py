@@ -77,7 +77,7 @@ def get_policy_stats(env_name, policy_name, extra_overrides):
     batch = next(iter(dataloader))
     obs = {}
     for k in batch:
-        if k.startswith("observation"):
+        if "observation" in k:
             obs[k] = batch[k]
 
     if "n_action_steps" in cfg.policy:
@@ -115,8 +115,8 @@ if __name__ == "__main__":
             ["policy.n_action_steps=8", "policy.num_inference_steps=10", "policy.down_dims=[128, 256, 512]"],
         ),
         ("aloha", "act", ["policy.n_action_steps=10"]),
-        ("dora_aloha_real", "act_real", ["policy.n_action_steps=10"]),
-        ("dora_aloha_real", "act_real_no_state", ["policy.n_action_steps=10"]),
+        ("dora_aloha_real", "act_real", []),
+        ("dora_aloha_real", "act_real_no_state", []),
     ]
     for env, policy, extra_overrides in env_policies:
         save_policy_to_safetensors("tests/data/save_policy_to_safetensors", env, policy, extra_overrides)
