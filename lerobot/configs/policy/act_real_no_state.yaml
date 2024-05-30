@@ -9,7 +9,7 @@
 # ```bash
 # python lerobot/scripts/train.py \
 #   policy=act_real_no_state \
-#   env=dora_aloha_real
+#   env=aloha2_real
 # ```
 
 seed: 1000
