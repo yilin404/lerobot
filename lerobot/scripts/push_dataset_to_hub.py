@@ -86,6 +86,8 @@ def get_from_raw_to_lerobot_format_fn(raw_format):
         from lerobot.common.datasets.push_dataset_to_hub.aloha_hdf5_format import from_raw_to_lerobot_format
     elif raw_format == "aloha_dora":
         from lerobot.common.datasets.push_dataset_to_hub.aloha_dora_format import from_raw_to_lerobot_format
+    elif raw_format == "reachy2_hdf5":
+        from lerobot.common.datasets.push_dataset_to_hub.reachy2_hdf5_format import from_raw_to_lerobot_format
     elif raw_format == "xarm_pkl":
         from lerobot.common.datasets.push_dataset_to_hub.xarm_pkl_format import from_raw_to_lerobot_format
     else:
