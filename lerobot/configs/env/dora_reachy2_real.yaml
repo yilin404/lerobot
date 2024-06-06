@@ -5,8 +5,8 @@ fps: 30
 env:
   name: dora
   task: DoraReachy2-v0
-  state_dim: 16
-  action_dim: 16
+  state_dim: 22
+  action_dim: 22
   fps: ${fps}
   episode_length: 400
   gym:
