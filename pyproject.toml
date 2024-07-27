@@ -25,6 +25,10 @@ classifiers=[
 ]
 packages = [{include = "lerobot"}]
 
+[[tool.poetry.source]]
+name = "pytorch-nightly"
+url = "https://download.pytorch.org/whl/nightly/cu121"
+secondary = true
 
 [tool.poetry.dependencies]
 python = ">=3.10,<3.13"
@@ -38,10 +42,10 @@ einops = ">=0.8.0"
 pymunk = ">=6.6.0"
 zarr = ">=2.17.0"
 numba = ">=0.59.0"
-torch = ">=2.2.1"
+torch = { version = "*", source = "pytorch-nightly" }
+torchvision = { version = "*", source = "pytorch-nightly" }
 opencv-python = ">=4.9.0"
 diffusers = ">=0.27.2"
-torchvision = ">=0.17.1"
 h5py = ">=3.10.0"
 huggingface-hub = {extras = ["hf-transfer"], version = ">=0.23.0"}
 gymnasium = ">=0.29.1"
