@@ -38,7 +38,7 @@ training:
   lr: 1e-4
   lr_backbone: 1e-4
   weight_decay: 1e-4
-  grad_clip_norm: 10
+  grad_clip_norm: 20
   online_steps_between_rollouts: 1
 
   delta_timestamps:
