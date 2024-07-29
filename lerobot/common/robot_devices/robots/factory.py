@@ -9,7 +9,7 @@ def make_robot(name):
         robot = KochRobot(
             leader_arms={
                 "main": DynamixelMotorsBus(
-                    port="/dev/tty.usbmodem575E0031751",
+                    port="/dev/ttyACM1",
                     motors={
                         # name: (index, model)
                         "shoulder_pan": (1, "xl330-m077"),
@@ -23,7 +23,7 @@ def make_robot(name):
             },
             follower_arms={
                 "main": DynamixelMotorsBus(
-                    port="/dev/tty.usbmodem575E0032081",
+                    port="/dev/ttyACM0",
                     motors={
                         # name: (index, model)
                         "shoulder_pan": (1, "xl430-w250"),
@@ -36,8 +36,8 @@ def make_robot(name):
                 ),
             },
             cameras={
-                "laptop": OpenCVCamera(0, fps=30, width=640, height=480),
-                "phone": OpenCVCamera(1, fps=30, width=640, height=480),
+                "laptop": OpenCVCamera("/dev/video2", fps=30, width=640, height=480),
+                "phone": OpenCVCamera("/dev/video6", fps=30, width=640, height=480),
             },
         )
     else:
