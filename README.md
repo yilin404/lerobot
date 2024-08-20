@@ -31,7 +31,7 @@
     <p>We just dropped an in-depth tutorial on how to build your own robot!</p>
     <p>Teach it new skills by showing it a few moves with just a laptop.</p>
     <p>Then watch your homemade robot act autonomously 🤯</p>
-    <p>For more info, see [our thread on X](https://x.com/RemiCadene/status/1825455895561859185) or [our tutorial page](https://github.com/huggingface/lerobot/blob/main/examples/7_get_started_with_real_robot.md).</p>
+    <p>For more info, see <a href="https://x.com/RemiCadene/status/1825455895561859185">our thread on X</a> or <a href="https://github.com/huggingface/lerobot/blob/main/examples/7_get_started_with_real_robot.md">our tutorial page</a>.</p>
 </div>
 
 
