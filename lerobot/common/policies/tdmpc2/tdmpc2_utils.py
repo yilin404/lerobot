@@ -106,7 +106,10 @@ def two_hot_inv(x, cfg):
     if DREG_BINS is None:
         DREG_BINS = torch.linspace(cfg.vmin, cfg.vmax, cfg.num_bins, device=x.device)
     x = F.softmax(x, dim=-1)
-    x = torch.sum(x * DREG_BINS, dim=-1, keepdim=True)
+
+    # cloning bins to avoid the inference tensor errodr
+    x = torch.sum(x * DREG_BINS.clone(), dim=-1, keepdim=True)
+
     return symexp(x)
 
 
@@ -177,12 +180,12 @@ class SimNorm(nn.Module):
 
     def __init__(self, cfg):
         super().__init__()
-        # TODO: move to config
-        self.dim = 8  # cfg.simnorm_dim
+        self.dim = cfg.simnorm_dim
 
     def forward(self, x):
         shp = x.shape
         x = x.view(*shp[:-1], -1, self.dim)
+
         x = F.softmax(x, dim=-1)
         return x.view(*shp)
 
@@ -237,7 +240,7 @@ def conv(in_shape, num_channels, act=None):
     Basic convolutional encoder for TD-MPC2 with raw image observations.
     4 layers of convolution with ReLU activations, followed by a linear layer.
     """
-    assert in_shape[-1] == 64  # assumes rgb observations to be 64x64
+    #assert in_shape[-1] == 64  # assumes rgb observations to be 64x64
     layers = [
         ShiftAug(),
         PixelPreprocess(),

@@ -106,6 +106,7 @@ class TDMPC2Config:
     vmax = +10
     rho: float = 0.5
     tau: float = 0.01
+    simnorm_dim: int = 8
 
     # Input / output structure.
     n_action_repeats: int = 2
@@ -115,7 +116,7 @@ class TDMPC2Config:
     input_shapes: dict[str, list[int]] = field(
         default_factory=lambda: {
             "observation.image": [3, 64, 64],
-            # "observation.state": [4],
+            "observation.state": [4],
         }
     )
     output_shapes: dict[str, list[int]] = field(
@@ -134,7 +135,7 @@ class TDMPC2Config:
     # Neural networks.
     image_encoder_hidden_dim: int = 32
     state_encoder_hidden_dim: int = 256
-    latent_dim: int = 50
+    latent_dim: int = 8 #50
     q_ensemble_size: int = 5
     mlp_dim: int = 512
     # Reinforcement learning.

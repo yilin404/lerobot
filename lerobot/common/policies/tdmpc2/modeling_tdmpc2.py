@@ -111,7 +111,7 @@ class TDMPC2Policy(nn.Module, PyTorchModelHubMixin):
         called on `env.reset()`
         """
         self._queues = {
-            # "observation.state": deque(maxlen=1),
+            "observation.state": deque(maxlen=1),
             "action": deque(maxlen=max(self.config.n_action_steps, self.config.n_action_repeats)),
         }
         if self._use_image:
@@ -150,9 +150,7 @@ class TDMPC2Policy(nn.Module, PyTorchModelHubMixin):
                 encode_keys.append("observation.image")
             if self._use_env_state:
                 encode_keys.append("observation.environment_state")
-
-            # if False:  # hardcoded for initial tdmpc2 impl
-            #    encode_keys.append("observation.state")
+            encode_keys.append("observation.state")
 
             z = self.model.encode({k: batch[k] for k in encode_keys})
 
@@ -337,9 +335,7 @@ class TDMPC2Policy(nn.Module, PyTorchModelHubMixin):
 
             td_targets = reward + discount * self.model.Qs(next_z, pi, return_type="min", target=True)
 
-        # Prepare for update
-        self.optim.zero_grad(set_to_none=True)
-        self.model.train()
+        #self.model.train()
 
         # Latent rollout
         zs = torch.empty(self.config.horizon + 1, batch_size, self.config.latent_dim, device=device)
@@ -495,8 +491,6 @@ class TDMPC2TOLD(nn.Module):
         """
         for p in self._Qs.parameters():
             p.requires_grad_(mode)
-        if self.config.multitask:
-            raise NotImplementedError("Multitask not implemented for TOLD yet.")
 
     def weight_init(self, m):  # lifted from Nicklas' code
         """Custom weight initialization for TD-MPC2."""
@@ -556,9 +550,6 @@ class TDMPC2TOLD(nn.Module):
         The policy prior is a Gaussian distribution with
         mean and (log) std predicted by a neural network.
         """
-        if self.config.multitask:
-            raise NotImplementedError("Multitask not implemented for pi yet.")
-
         # Gaussian policy prior
         mu, log_std = self._pi(z).chunk(2, dim=-1)
         log_std = utils.log_std_fn(log_std, self.log_std_min, self.log_std_dif)
@@ -592,9 +583,6 @@ class TDMPC2TOLD(nn.Module):
             (*,) tensor if return_min=True.
         """
         assert return_type in {"min", "avg", "all"}
-
-        if self.config.multitask:
-            raise NotImplementedError("Multitask not implemented for Qs yet.")
 
         z = torch.cat([z, a], dim=-1)
         out = (self._target_Qs if target else self._Qs)(z)
@@ -639,6 +627,18 @@ class TDMPC2ObservationEncoder(nn.Module):
             elif "observation.image" in k:
                 obs_shape = config.input_shapes["observation.image"]
                 self.image_enc_layers = utils.conv(obs_shape, config.num_channels, act=utils.SimNorm(config))
+                dummy_batch = torch.zeros(1, *config.input_shapes["observation.image"])
+                with torch.no_grad():
+                    out_shape = self.image_enc_layers(dummy_batch).shape[1]
+                self.image_enc_layers.extend(
+                    utils.mlp(
+                            out_shape,
+                            max(config.num_enc_layers - 1, 1) * [config.enc_dim],
+                            config.latent_dim,
+                            act=utils.SimNorm(config),
+                            ))
+            
+
 
     def forward(self, obs_dict: dict[str, Tensor]) -> Tensor:
         """Encode the image and/or state vector.
@@ -654,6 +654,7 @@ class TDMPC2ObservationEncoder(nn.Module):
             feat.append(self.env_state_enc_layers(obs_dict["observation.environment_state"]))
         if "observation.state" in self.config.input_shapes:
             feat.append(self.state_enc_layers(obs_dict["observation.state"]))
+
         return torch.stack(feat, dim=0).mean(0)
 
 
