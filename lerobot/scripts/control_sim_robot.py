@@ -44,7 +44,7 @@ python lerobot/scripts/control_robot.py replay \
     --fps 30 \
     --root tmp/data \
     --repo-id $USER/koch_test \
-    --episode 0
+    --episodes 0
 ```
 
 - Record a full dataset in order to train a policy,
@@ -115,8 +115,6 @@ from lerobot.scripts.push_dataset_to_hub import (
 ########################################################################################
 # Utilities
 ########################################################################################
-
-
 def say(text, blocking=False):
     # Check if mac, linux, or windows.
     if platform.system() == "Darwin":
@@ -571,27 +569,34 @@ def record(
     return lerobot_dataset
 
 
-def replay(robot: Robot, episode: int, fps: int | None = None, root="data", repo_id="lerobot/debug"):
-    # TODO(rcadene): Add option to record logs
+def replay(env, episodes: list, fps: int | None = None, root="data", repo_id="lerobot/debug"):
+
+    env = env()
     local_dir = Path(root) / repo_id
     if not local_dir.exists():
         raise ValueError(local_dir)
 
     dataset = LeRobotDataset(repo_id, root=root)
     items = dataset.hf_dataset.select_columns("action")
-    from_idx = dataset.episode_data_index["from"][episode].item()
-    to_idx = dataset.episode_data_index["to"][episode].item()
+    for episode in episodes:
+        env.reset()
+        from_idx = dataset.episode_data_index["from"][episode].item()
+        to_idx = dataset.episode_data_index["to"][episode].item()
+    
+        logging.info("Replaying episode")
+        say("Replaying episode", blocking=True)
+        for idx in range(from_idx, to_idx):
+            start_episode_t = time.perf_counter()
+    
+            action = items[idx]["action"]
+    
+            env.step(action.unsqueeze(0).numpy())
+    
+            dt_s = time.perf_counter() - start_episode_t
+            busy_wait(1 / fps - dt_s)
 
-    logging.info("Replaying episode")
-    say("Replaying episode", blocking=True)
-    for idx in range(from_idx, to_idx):
-        start_episode_t = time.perf_counter()
-
-        action = items[idx]["action"]
-        robot.send_action(action)
-
-        dt_s = time.perf_counter() - start_episode_t
-        busy_wait(1 / fps - dt_s)
+        # wait before playing next episode
+        busy_wait(5)
 
 
 
@@ -612,7 +617,6 @@ if __name__ == "__main__":
         "--sim-config",
         help="Path to a yaml config you want to use for initializing a sim environment based on gym ",
         )
-
 
     parser_teleop = subparsers.add_parser("teleoperate", parents=[base_parser])
     parser_teleop.add_argument(
@@ -705,7 +709,7 @@ if __name__ == "__main__":
         default="lerobot/test",
         help="Dataset identifier. By convention it should match '{hf_username}/{dataset_name}' (e.g. `lerobot/test`).",
     )
-    parser_replay.add_argument("--episode", type=int, default=0, help="Index of the episode to replay.")
+    parser_replay.add_argument("--episodes", nargs='+', type=int, default=[0], help="Indices of the episodes to replay.")
 
     args = parser.parse_args()
 
@@ -723,12 +727,14 @@ if __name__ == "__main__":
     env_cfg = init_hydra_config(env_config_path)
     env_fn = lambda: make_env(env_cfg, n_envs=1)
     
-    # make robot
-    robot_overrides = ['~cameras', '~follower_arms']
-    robot_cfg = init_hydra_config(robot_path, robot_overrides)
-    robot = make_robot(robot_cfg)
+    robot = None
+    if control_mode != 'replay':
+        # make robot
+        robot_overrides = ['~cameras', '~follower_arms']
+        robot_cfg = init_hydra_config(robot_path, robot_overrides)
+        robot = make_robot(robot_cfg)
     
-    kwargs.update(env_cfg.calibration)
+        kwargs.update(env_cfg.calibration)
 
     if control_mode == "teleoperate":
         teleoperate(env_fn, robot, **kwargs)
@@ -737,12 +743,12 @@ if __name__ == "__main__":
         record(env_fn, robot, **kwargs)
 
     elif control_mode == "replay":
-        replay(env_fn, robot, **kwargs)
+        replay(env_fn, **kwargs)
 
     else:
         raise ValueError(f"Invalid control mode: '{control_mode}', only valid modes are teleoperate, record and replay." )
 
-    if robot.is_connected:
+    if robot and robot.is_connected:
         # Disconnect manually to avoid a "Core dump" during process
         # termination due to camera threads not properly exiting.
         robot.disconnect()
