@@ -6,26 +6,23 @@ Useful to record a dataset, replay a recorded episode and record an evaluation d
 Examples of usage:
 
 
-- Unlimited teleoperation at highest frequency (~200 Hz is expected), to exit with CTRL+C:
-```bash
-python lerobot/scripts/control_robot.py teleoperate
-
-# Remove the cameras from the robot definition. They are not used in 'teleoperate' anyway.
-python lerobot/scripts/control_robot.py teleoperate --robot-overrides '~cameras'
-```
-
-- Unlimited teleoperation at a limited frequency of 30 Hz, to simulate data recording frequency:
+- Unlimited teleoperation at a limited frequency of 30 Hz, to simulate data recording frequency.
+  You can modify this value depending on how fast your simulation can run:
 ```bash
 python lerobot/scripts/control_robot.py teleoperate \
-    --fps 30
+    --fps 30 \
+    --robot-path lerobot/configs/robot/your_robot_config.yaml \
+    --sim-config lerobot/configs/env/your_sim_config.yaml
 ```
 
 - Record one episode in order to test replay:
 ```bash
-python lerobot/scripts/control_robot.py record \
+python lerobot/scripts/control_sim_robot.py record \
+    --robot-path lerobot/configs/robot/your_robot_config.yaml \
+    --sim-config lerobot/configs/env/your_sim_config.yaml \
     --fps 30 \
     --root tmp/data \
-    --repo-id $USER/koch_test \
+    --repo-id $USER/robot_sim_test \
     --num-episodes 1 \
     --run-compute-stats 0
 ```
@@ -34,13 +31,14 @@ python lerobot/scripts/control_robot.py record \
 ```bash
 python lerobot/scripts/visualize_dataset.py \
     --root tmp/data \
-    --repo-id $USER/koch_test \
+    --repo-id $USER/robot_sim_test \
     --episode-index 0
 ```
 
 - Replay this test episode:
 ```bash
-python lerobot/scripts/control_robot.py replay \
+python lerobot/scripts/control_sim_robot.py replay \
+    --sim-config lerobot/configs/env/your_sim_config.yaml \
     --fps 30 \
     --root tmp/data \
     --repo-id $USER/koch_test \
@@ -50,10 +48,12 @@ python lerobot/scripts/control_robot.py replay \
 - Record a full dataset in order to train a policy,
 30 seconds of recording for each episode, and 10 seconds to reset the environment in between episodes:
 ```bash
-python lerobot/scripts/control_robot.py record \
+python lerobot/scripts/control_sim_robot.py record \
+    --robot-path lerobot/configs/robot/your_robot_config.yaml \
+    --sim-config lerobot/configs/env/your_sim_config.yaml \
     --fps 30 \
     --root data \
-    --repo-id $USER/koch_pick_place_lego \
+    --repo-id $USER/robot_sim_test \
     --num-episodes 50 \
     --episode-time-s 30 \
     --reset-time-s 10
