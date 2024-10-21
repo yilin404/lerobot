@@ -194,7 +194,7 @@ def read_commands_from_leader(robot: Robot, queue: multiprocessing.Queue, fps: i
     start_pos = np.array(robot.leader_arms.main.calibration['start_pos'])
     axis_directions = np.array(axis_directions)
     offsets = np.array(offsets) * np.pi
-    counts_to_radians = np.pi * 2. / 4096
+    counts_to_radians = 2.0 * np.pi / 4096
 
     if stop_flag is None:
         stop_flag = multiprocessing.Value('b', False)
@@ -391,14 +391,15 @@ def record(
                 state_obs = []
                 for key in state_keys:
                     state_obs.append(torch.from_numpy(observation[key]))
-                ep_dict['observation.state'].append(torch.hstack(state_obs))
+                ep_dict['observation.state'].append(torch.hstack(state_obs) * 180.0 / np.pi)
 
                 # Advance the sim environment
                 if len(action.shape) == 1:
                     action = np.expand_dims(action, 0)
                 observation, reward, _, _ , info = env.step(action)
-                ep_dict['action'].append(torch.from_numpy(action))
+                ep_dict['action'].append(torch.from_numpy(action) * 180.0 / np.pi)
                 ep_dict['reward'].append(torch.tensor(reward))
+                print(reward)
 
                 frame_index += 1
 
@@ -590,7 +591,7 @@ def replay(env, episodes: list, fps: int | None = None, root="data", repo_id="le
     
             action = items[idx]["action"]
     
-            env.step(action.unsqueeze(0).numpy())
+            env.step(action.unsqueeze(0).numpy() * np.pi / 180.0)
     
             dt_s = time.perf_counter() - start_episode_t
             busy_wait(1 / fps - dt_s)
