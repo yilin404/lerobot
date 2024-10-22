@@ -137,6 +137,8 @@ class TDMPCPolicy(
         if self._use_image:
             batch = dict(batch)  # shallow copy so that adding a key doesn't modify the original
             batch["observation.image"] = batch[self.input_image_key]
+            #TODO michel_aractingi temp fix to remove before merge
+            del batch[self.input_image_key]
 
         self._queues = populate_queues(self._queues, batch)
 
@@ -343,7 +345,7 @@ class TDMPCPolicy(
                 batch[key] = batch[key].transpose(1, 0)
 
         action = batch["action"]  # (t, b, action_dim)
-        reward = batch["next.reward"]  # (t, b)
+        reward = batch["reward"]  # (t, b)
         observations = {k: v for k, v in batch.items() if k.startswith("observation.")}
 
         # Apply random image augmentations.
@@ -420,7 +422,7 @@ class TDMPCPolicy(
             (
                 temporal_loss_coeffs
                 * F.mse_loss(reward_preds, reward, reduction="none")
-                * ~batch["next.reward_is_pad"]
+                * ~batch["reward_is_pad"]
                 # `reward_preds` depends on the current observation and the actions.
                 * ~batch["observation.state_is_pad"][0]
                 * ~batch["action_is_pad"]
@@ -441,7 +443,7 @@ class TDMPCPolicy(
                 * ~batch["observation.state_is_pad"][0]
                 * ~batch["action_is_pad"]
                 # q_targets depends on the reward and the next observations.
-                * ~batch["next.reward_is_pad"]
+                * ~batch["reward_is_pad"]
                 * ~batch["observation.state_is_pad"][1:]
             )
             .sum(0)

@@ -591,7 +591,6 @@ def replay(env, episodes: list, fps: int | None = None, root="data", repo_id="le
         from_idx = dataset.episode_data_index["from"][episode].item()
         to_idx = dataset.episode_data_index["to"][episode].item()
         env.reset(seed=seeds[from_idx].item())
-    
         logging.info("Replaying episode")
         say("Replaying episode", blocking=True)
         for idx in range(from_idx, to_idx):
