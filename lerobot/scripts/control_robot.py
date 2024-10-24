@@ -207,6 +207,8 @@ def record(
     num_image_writer_threads_per_camera: int = 4,
     display_cameras: bool = True,
     play_sounds: bool = True,
+    tags: str = None,
+    force_override: bool = False,
 ) -> LeRobotDataset:
     # TODO(rcadene): Add option to record logs
     listener = None
@@ -237,8 +239,8 @@ def record(
     dataset = LeRobotDataset.create(
         repo_id,
         fps,
-        robot,
         root=root,
+        robot=robot,
         image_writer_processes=num_image_writer_processes,
         image_writer_threads_per_camera=num_image_writer_threads_per_camera,
         use_videos=video,
