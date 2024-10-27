@@ -87,7 +87,7 @@ import gymnasium as gym
 import multiprocessing 
 from contextlib import nullcontext
 
-
+import importlib
 import cv2
 import torch
 import numpy as np
@@ -142,6 +142,7 @@ def say(text, blocking=False):
     os.system(cmd)
 
 
+
 def save_image(img_arr, key, frame_index, episode_index, videos_dir):
     img = Image.fromarray(img_arr)
     path = videos_dir / f"{key}_episode_{episode_index:06d}" / f"frame_{frame_index:06d}.png"
@@ -155,7 +156,7 @@ def show_image_observations(observation_queue:multiprocessing.Queue):
         images = []
         if keys is None: keys = [k for k in observations if 'image' in k]
         for key in keys:
-            images.append(observations[key].squeeze(0))
+            images.append(observations[key])#.squeeze(0))
         cat_image = np.concatenate(images, 1)
         cv2.imshow('observations', cv2.cvtColor(cat_image, cv2.COLOR_RGB2BGR))
         cv2.waitKey(1)
@@ -273,6 +274,8 @@ def create_rl_hf_dataset(data_dict):
     features["next.reward"] = Value(dtype="float32", id=None)
 
     features["seed"] = Value(dtype="int64", id=None)
+    features["next.success"] = Value(dtype="bool", id=None)
+
     features["episode_index"] = Value(dtype="int64", id=None)
     features["frame_index"] = Value(dtype="int64", id=None)
     features["timestamp"] = Value(dtype="float32", id=None)
@@ -417,7 +420,7 @@ def record(
         while episode_index < num_episodes:
             logging.info(f"Recording episode {episode_index}")
             say(f"Recording episode {episode_index}")
-            ep_dict = {'action':[], 'next.reward':[]}
+            ep_dict = {'action':[], 'next.reward':[], 'next.success':[]}
             for k in state_keys_dict:
                 ep_dict[k] = []
             frame_index = 0
@@ -441,7 +444,7 @@ def record(
                     str_key = key if key.startswith('observation.images.') else 'observation.images.' + key
                     futures += [
                         executor.submit(
-                            save_image, observation[key].squeeze(0), str_key, frame_index, episode_index, videos_dir)
+                            save_image, observation[key], str_key, frame_index, episode_index, videos_dir)
                     ]
 
                 if not is_headless() and visualize_images:
@@ -453,15 +456,19 @@ def record(
                 # Advance the sim environment
                 if len(action.shape) == 1:
                     action = np.expand_dims(action, 0)
-                observation, reward, _, _ , info = env.step(action)
+                observation, reward, terminated, _ , info = env.step(action)
+
+                success = info.get('is_success', False)
+
                 ep_dict['action'].append(torch.from_numpy(action))
                 ep_dict['next.reward'].append(torch.tensor(reward))
-                print(reward)
+                ep_dict['next.success'].append(torch.tensor(success))
 
                 frame_index += 1
 
                 timestamp = time.perf_counter() - start_episode_t
-                if exit_early:
+
+                if exit_early or terminated:
                     exit_early = False
                     break
 
@@ -506,6 +513,7 @@ def record(
                 ep_dict[key] = torch.vstack(ep_dict[key]) * 180.0 / np.pi
             ep_dict['action'] = torch.vstack(ep_dict['action']) * 180.0 / np.pi
             ep_dict['next.reward'] = torch.stack(ep_dict['next.reward'])
+            ep_dict['next.success'] = torch.stack(ep_dict['next.success'])
 
             ep_dict["seed"] = torch.tensor([seed] * num_frames)
             ep_dict["episode_index"] = torch.tensor([episode_index] * num_frames)
@@ -656,7 +664,7 @@ def replay(env,
     
             action = items[idx]["action"]
     
-            env.step(action.unsqueeze(0).numpy() * np.pi / 180.0)
+            env.step(action.numpy() * np.pi / 180.0)
     
             dt_s = time.perf_counter() - start_episode_t
             busy_wait(1 / fps - dt_s)
@@ -806,7 +814,11 @@ if __name__ == "__main__":
 
     # make gym env
     env_cfg = init_hydra_config(env_config_path)
-    env_fn = lambda: make_env(env_cfg, n_envs=1)
+    #env_fn = lambda: make_env(env_cfg, n_envs=1)
+    package_name = f"gym_{env_cfg.env.name}"
+
+    importlib.import_module(f"gym_{env_cfg.env.name}")
+    env_fn = lambda: gym.make(env_cfg.env.handle, disable_env_checker=True, **env_cfg.env.gym)
     
     robot = None
     if control_mode != 'replay':
