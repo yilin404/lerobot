@@ -48,7 +48,9 @@ def safe_stop_image_writer(func):
 
 
 def save_image(img_tensor, key, frame_index, episode_index, videos_dir: str):
-    img = Image.fromarray(img_tensor.numpy())
+    if torch.is_tensor(img_tensor):
+        img_tensor = img_tensor.numpy()
+    img = Image.fromarray(img_tensor)
     path = Path(videos_dir) / f"{key}_episode_{episode_index:06d}" / f"frame_{frame_index:06d}.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     img.save(str(path), quality=100)
