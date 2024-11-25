@@ -93,6 +93,7 @@ def make_dataset(cfg, split: str = "train") -> LeRobotDataset | MultiLeRobotData
     if isinstance(cfg.dataset_repo_id, str):
         dataset = LeRobotDataset(
             cfg.dataset_repo_id,
+            root=cfg.dataset_root, # add support of local dataset
             split=split,
             delta_timestamps=cfg.training.get("delta_timestamps"),
             image_transforms=image_transforms,
@@ -101,6 +102,7 @@ def make_dataset(cfg, split: str = "train") -> LeRobotDataset | MultiLeRobotData
     else:
         dataset = MultiLeRobotDataset(
             cfg.dataset_repo_id,
+            root=cfg.dataset_root, # add support of local dataset
             split=split,
             delta_timestamps=cfg.training.get("delta_timestamps"),
             image_transforms=image_transforms,
