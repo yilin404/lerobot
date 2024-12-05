@@ -66,6 +66,11 @@ def get_policy_and_config_classes(name: str) -> tuple[Policy, object]:
         from lerobot.common.policies.vqbet.modeling_vqbet import VQBeTPolicy
 
         return VQBeTPolicy, VQBeTConfig
+    elif name == "rdt":
+        from lerobot.common.policies.rdt.configuration_rdt import RDTConfig
+        from lerobot.common.policies.rdt.modeling_rdt import RDTPolicy
+
+        return RDTPolicy, RDTConfig
     else:
         raise NotImplementedError(f"Policy with name {name} is not implemented.")
 
