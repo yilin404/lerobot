@@ -115,6 +115,9 @@ class ACTPolicy(
         if self.config.temporal_ensemble_coeff is not None:
             actions = self.model(batch)[0]  # (batch_size, chunk_size, action_dim)
             actions = self.unnormalize_outputs({"action": actions})["action"]
+            ### add support of relative action ###
+            if self.config.use_relative_action:
+                actions = batch["observation.state"].unsqueeze(1) + actions
             action = self.temporal_ensembler.update(actions)
             return action
 
@@ -125,6 +128,9 @@ class ACTPolicy(
 
             # TODO(rcadene): make _forward return output dictionary?
             actions = self.unnormalize_outputs({"action": actions})["action"]
+            ### add support of relative action ###
+            if self.config.use_relative_action:
+                actions = batch["observation.state"].unsqueeze(1) + actions
 
             # `self.model.forward` returns a (batch_size, n_action_steps, action_dim) tensor, but the queue
             # effectively has shape (n_action_steps, batch_size, *), hence the transpose.
@@ -138,6 +144,12 @@ class ACTPolicy(
             batch = dict(batch)  # shallow copy so that adding a key doesn't modify the original
             batch["observation.images"] = torch.stack([batch[k] for k in self.expected_image_keys], dim=-4)
         batch = self.normalize_targets(batch)
+
+        ### add support of relative action ###
+        if self.config.use_relative_action:
+            batch = dict(batch) # shallow copy so that adding a key doesn't modify the original
+            batch["action"] = batch["action"] - batch["observation.state"]
+
         actions_hat, (mu_hat, log_sigma_x2_hat) = self.model(batch)
 
         l1_loss = (
@@ -324,7 +336,7 @@ class ACT(nn.Module):
             backbone_model = getattr(torchvision.models, config.vision_backbone)(
                 replace_stride_with_dilation=[False, False, config.replace_final_stride_with_dilation],
                 weights=config.pretrained_backbone_weights,
-                norm_layer=FrozenBatchNorm2d,
+                norm_layer=FrozenBatchNorm2d if config.pretrained_backbone_weights is not None else None,
             )
             # Note: The assumption here is that we are using a ResNet model (and hence layer4 is the final
             # feature map).

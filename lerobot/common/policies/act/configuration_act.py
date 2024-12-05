@@ -136,6 +136,10 @@ class ACTConfig:
     latent_dim: int = 32
     n_vae_encoder_layers: int = 4
 
+    ### add support of relative action ###
+    # Relative Action
+    use_relative_action: bool = False
+
     # Inference.
     # Note: the value used in ACT when temporal ensembling is enabled is 0.01.
     temporal_ensemble_coeff: float | None = None
@@ -169,3 +173,14 @@ class ACTConfig:
             and "observation.environment_state" not in self.input_shapes
         ):
             raise ValueError("You must provide at least one image or the environment state among the inputs.")
+        ### add support of relative action
+        if (
+            self.use_relative_action
+            and self.input_shapes["observation.state"] != self.output_shapes["action"]
+        ):
+            raise ValueError(
+                "Relative actions can only be used when the dimensions of the state observation input "
+                "and the action output are the same. "
+                f"Received: observation.state dimension = {self.input_shapes['observation.state']}, "
+                f"action dimension = {self.output_shapes['action']}."
+            )
