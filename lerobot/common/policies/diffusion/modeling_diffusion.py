@@ -33,6 +33,7 @@ from diffusers.schedulers.scheduling_ddim import DDIMScheduler
 from diffusers.schedulers.scheduling_ddpm import DDPMScheduler
 from huggingface_hub import PyTorchModelHubMixin
 from torch import Tensor, nn
+import torchvision.models._utils
 
 from lerobot.common.policies.diffusion.configuration_diffusion import DiffusionConfig
 from lerobot.common.policies.normalize import Normalize, Unnormalize
@@ -176,7 +177,13 @@ class DiffusionModel(nn.Module):
         self.config = config
 
         # Build observation encoders (depending on which observations are provided).
-        global_cond_dim = config.input_shapes["observation.state"][0]
+        global_cond_dim = config.input_shapes["observation.state"][0] if not config.encode_state_by_mlp else config.encode_state_embed_dim
+        if config.encode_state_by_mlp:
+            self.state_encoder = nn.Sequential(
+                nn.Linear(config.input_shapes["observation.state"][0], config.encode_state_embed_dim * 4),
+                nn.Mish(),
+                nn.Linear(config.encode_state_embed_dim * 4, config.encode_state_embed_dim),
+            )
         num_images = len([k for k in config.input_shapes if k.startswith("observation.image")])
         self._use_images = False
         self._use_env_state = False
@@ -243,7 +250,7 @@ class DiffusionModel(nn.Module):
     def _prepare_global_conditioning(self, batch: dict[str, Tensor]) -> Tensor:
         """Encode image features and concatenate them all together along with the state vector."""
         batch_size, n_obs_steps = batch["observation.state"].shape[:2]
-        global_cond_feats = [batch["observation.state"]]
+        global_cond_feats = [batch["observation.state"] if not self.config.encode_state_by_mlp else self.state_encoder(batch["observation.state"])]
         # Extract image features.
         if self._use_images:
             if self.config.use_separate_rgb_encoder_per_camera:
@@ -371,77 +378,6 @@ class DiffusionModel(nn.Module):
         return loss.mean()
 
 
-class SpatialSoftmax(nn.Module):
-    """
-    Spatial Soft Argmax operation described in "Deep Spatial Autoencoders for Visuomotor Learning" by Finn et al.
-    (https://arxiv.org/pdf/1509.06113). A minimal port of the robomimic implementation.
-
-    At a high level, this takes 2D feature maps (from a convnet/ViT) and returns the "center of mass"
-    of activations of each channel, i.e., keypoints in the image space for the policy to focus on.
-
-    Example: take feature maps of size (512x10x12). We generate a grid of normalized coordinates (10x12x2):
-    -----------------------------------------------------
-    | (-1., -1.)   | (-0.82, -1.)   | ... | (1., -1.)   |
-    | (-1., -0.78) | (-0.82, -0.78) | ... | (1., -0.78) |
-    | ...          | ...            | ... | ...         |
-    | (-1., 1.)    | (-0.82, 1.)    | ... | (1., 1.)    |
-    -----------------------------------------------------
-    This is achieved by applying channel-wise softmax over the activations (512x120) and computing the dot
-    product with the coordinates (120x2) to get expected points of maximal activation (512x2).
-
-    The example above results in 512 keypoints (corresponding to the 512 input channels). We can optionally
-    provide num_kp != None to control the number of keypoints. This is achieved by a first applying a learnable
-    linear mapping (in_channels, H, W) -> (num_kp, H, W).
-    """
-
-    def __init__(self, input_shape, num_kp=None):
-        """
-        Args:
-            input_shape (list): (C, H, W) input feature map shape.
-            num_kp (int): number of keypoints in output. If None, output will have the same number of channels as input.
-        """
-        super().__init__()
-
-        assert len(input_shape) == 3
-        self._in_c, self._in_h, self._in_w = input_shape
-
-        if num_kp is not None:
-            self.nets = torch.nn.Conv2d(self._in_c, num_kp, kernel_size=1)
-            self._out_c = num_kp
-        else:
-            self.nets = None
-            self._out_c = self._in_c
-
-        # we could use torch.linspace directly but that seems to behave slightly differently than numpy
-        # and causes a small degradation in pc_success of pre-trained models.
-        pos_x, pos_y = np.meshgrid(np.linspace(-1.0, 1.0, self._in_w), np.linspace(-1.0, 1.0, self._in_h))
-        pos_x = torch.from_numpy(pos_x.reshape(self._in_h * self._in_w, 1)).float()
-        pos_y = torch.from_numpy(pos_y.reshape(self._in_h * self._in_w, 1)).float()
-        # register as buffer so it's moved to the correct device.
-        self.register_buffer("pos_grid", torch.cat([pos_x, pos_y], dim=1))
-
-    def forward(self, features: Tensor) -> Tensor:
-        """
-        Args:
-            features: (B, C, H, W) input feature maps.
-        Returns:
-            (B, K, 2) image-space coordinates of keypoints.
-        """
-        if self.nets is not None:
-            features = self.nets(features)
-
-        # [B, K, H, W] -> [B * K, H * W] where K is number of keypoints
-        features = features.reshape(-1, self._in_h * self._in_w)
-        # 2d softmax normalization
-        attention = F.softmax(features, dim=-1)
-        # [B * K, H * W] x [H * W, 2] -> [B * K, 2] for spatial coordinate mean in x and y dimensions
-        expected_xy = attention @ self.pos_grid
-        # reshape to [B, K, 2]
-        feature_keypoints = expected_xy.view(-1, self._out_c, 2)
-
-        return feature_keypoints
-
-
 class DiffusionRgbEncoder(nn.Module):
     """Encoder an RGB image into a 1D feature vector.
 
@@ -464,13 +400,15 @@ class DiffusionRgbEncoder(nn.Module):
 
         # Set up backbone.
         backbone_model = getattr(torchvision.models, config.vision_backbone)(
-            weights=config.pretrained_backbone_weights
+            weights=config.pretrained_backbone_weights,
+            norm_layer=torchvision.ops.misc.FrozenBatchNorm2d if config.pretrained_backbone_weights is not None else None,
         )
-        # Note: This assumes that the layer4 feature map is children()[-3]
-        # TODO(alexander-soare): Use a safer alternative.
-        self.backbone = nn.Sequential(*(list(backbone_model.children())[:-2]))
+        # Note: The assumption here is that we are using a ResNet model (and hence layer4 is the final
+        # feature map).
+        # Note: The forward method of this returns a dict: {"feature_map": output}.
+        self.backbone = torchvision.models._utils.IntermediateLayerGetter(backbone_model, return_layers={"avgpool": "feature"})
         if config.use_group_norm:
-            if config.pretrained_backbone_weights:
+            if config.pretrained_backbone_weights is not None:
                 raise ValueError(
                     "You can't replace BatchNorm in a pretrained model without ruining the weights!"
                 )
@@ -479,26 +417,8 @@ class DiffusionRgbEncoder(nn.Module):
                 predicate=lambda x: isinstance(x, nn.BatchNorm2d),
                 func=lambda x: nn.GroupNorm(num_groups=x.num_features // 16, num_channels=x.num_features),
             )
-
-        # Set up pooling and final layers.
-        # Use a dry run to get the feature map shape.
-        # The dummy input should take the number of image channels from `config.input_shapes` and it should
-        # use the height and width from `config.crop_shape` if it is provided, otherwise it should use the
-        # height and width from `config.input_shapes`.
-        image_keys = [k for k in config.input_shapes if k.startswith("observation.image")]
-        # Note: we have a check in the config class to make sure all images have the same shape.
-        image_key = image_keys[0]
-        dummy_input_h_w = (
-            config.crop_shape if config.crop_shape is not None else config.input_shapes[image_key][1:]
-        )
-        dummy_input = torch.zeros(size=(1, config.input_shapes[image_key][0], *dummy_input_h_w))
-        with torch.inference_mode():
-            dummy_feature_map = self.backbone(dummy_input)
-        feature_map_shape = tuple(dummy_feature_map.shape[1:])
-        self.pool = SpatialSoftmax(feature_map_shape, num_kp=config.spatial_softmax_num_keypoints)
-        self.feature_dim = config.spatial_softmax_num_keypoints * 2
-        self.out = nn.Linear(config.spatial_softmax_num_keypoints * 2, self.feature_dim)
-        self.relu = nn.ReLU()
+        
+        self.feature_dim = backbone_model.fc.in_features
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -515,9 +435,7 @@ class DiffusionRgbEncoder(nn.Module):
                 # Always use center crop for eval.
                 x = self.center_crop(x)
         # Extract backbone feature.
-        x = torch.flatten(self.pool(self.backbone(x)), start_dim=1)
-        # Final linear layer with non-linearity.
-        x = self.relu(self.out(x))
+        x = self.backbone(x)["feature"]
         return x
 
 

@@ -130,7 +130,7 @@ class DiffusionConfig:
     crop_is_random: bool = True
     pretrained_backbone_weights: str | None = None
     use_group_norm: bool = True
-    spatial_softmax_num_keypoints: int = 32
+    vision_embed_dim: int = 512
     use_separate_rgb_encoder_per_camera: bool = False
     # Unet.
     down_dims: tuple[int, ...] = (512, 1024, 2048)
@@ -138,6 +138,8 @@ class DiffusionConfig:
     n_groups: int = 8
     diffusion_step_embed_dim: int = 128
     use_film_scale_modulation: bool = True
+    encode_state_by_mlp: bool = False
+    encode_state_embed_dim: int | None = None
     # Noise scheduler.
     noise_scheduler_type: str = "DDPM"
     num_train_timesteps: int = 100
@@ -206,4 +208,10 @@ class DiffusionConfig:
             raise ValueError(
                 "The horizon should be an integer multiple of the downsampling factor (which is determined "
                 f"by `len(down_dims)`). Got {self.horizon=} and {self.down_dims=}"
+            )
+        
+        # Check that encode_state_embed_dim is provided if encode_state_by_mlp is True
+        if self.encode_state_by_mlp and self.encode_state_embed_dim is None:
+            raise ValueError(
+                "You must provide `encode_state_embed_dim` when `encode_state_by_mlp` is True."
             )
